@@ -1,6 +1,6 @@
 # main.py
 from page_finder import PageFinder
-from table_processors import LowBidderTableProcessor
+from table_processors import LowBidderTableProcessor, RemainingBidderTableProcessor
 
 PDF_FILE_PATH = '11-430234.pdf'
 FILE_NAME = PDF_FILE_PATH.split('.')[0]
@@ -11,10 +11,16 @@ def main():
     # 1. Use the PageFinder to discover where the tables are
     finder = PageFinder(file_path=PDF_FILE_PATH)
     
+    finder.find_bid_info()
     # Define keywords that mark the beginning and end of your sections
     bid_item_range = finder.find_page_range(
         start_keyword="contract proposal of low bidder", # Example keyword
         end_keyword="summary of remaining bidders"   # Example keyword
+    )
+
+    remaining_bidder_range = finder.find_page_range(
+        start_keyword="summary of remaining bidders",
+        end_keyword="summary of all bidders",
     )
     
     # You could find other ranges here too
@@ -22,14 +28,27 @@ def main():
     
     finder.close() # Good practice to close the file
 
-    # 2. If the range was found, create a processor and run it
-    if bid_item_range:
-        bid_item_processor = LowBidderTableProcessor(
-            file_path=PDF_FILE_PATH,
-            page_range=bid_item_range # Pass the discovered range here
-        )
-        bid_item_processor.run()  # Set plot=True to visualize the tables
-        bid_item_processor.save_to_csv(f'{FILE_NAME}.csv')
+    # # 2. If the range was found, create a processor and run it
+    # if bid_item_range:
+    #     bid_item_processor = LowBidderTableProcessor(
+    #         file_path=PDF_FILE_PATH,
+    #         plot=True,
+    #         page_range=bid_item_range # Pass the discovered range here
+    #     )
+    #     bid_item_processor.run()  # Set plot=True to visualize the tables
+    #     bid_item_processor.save_to_csv(f'{FILE_NAME}.csv')
+
+
+
+    #     # 2. If the range was found, create a processor and run it
+    # if remaining_bidder_range:
+    #     bid_item_processor = RemainingBidderTableProcessor(
+    #         file_path=PDF_FILE_PATH,
+    #         plot=True,
+    #         page_range='17-17' # Pass the discovered range here
+    #     )
+    #     bid_item_processor.run()  # Set plot=True to visualize the tables
+    #     bid_item_processor.save_to_csv(f'{FILE_NAME}.csv')
 
 if __name__ == "__main__":
     main()

@@ -7,11 +7,11 @@ class BaseTableProcessor:
     HEADERS = []
 
     # Update the initializer to accept a page_range
-    def __init__(self, file_path, page_range):
+    def __init__(self, file_path, page_range, plot=False):
         self.file_path = file_path
         self.page_range = page_range # Store the dynamic page range
         self.df = None
-        self.plot = False  # Default to not plotting
+        self.plot = plot  # Default to not plotting
 
     def _extract_raw_dfs(self):
         if not self.page_range:
@@ -31,6 +31,7 @@ class BaseTableProcessor:
         if(self.plot):
             for i, table in enumerate(tables):
                 camelot.plot(table, kind='grid').show()
+
         return [table.df for table in tables]
 
     def _process(self, raw_dfs):
@@ -53,9 +54,8 @@ class BaseTableProcessor:
         else:
             print("No data to save. Run the process first.")
     
-    def run(self, plot=False):
+    def run(self):
         """The main execution method that orchestrates the entire process."""
-        self.plot = plot
         print(f"--- Starting processing for {self.__class__.__name__} ---")
         raw_dataframes = self._extract_raw_dfs()
         if not raw_dataframes:
@@ -127,11 +127,9 @@ class RemainingBidderTableProcessor(BaseTableProcessor):
     """Processes the detailed 'Bid Item' tables."""
     
     # --- Configuration specific to this table type ---
-    PAGE_RANGE = "3-20"
-    TABLE_AREA = ['38.2, 29.8, 752, 478']
+    TABLE_AREA = ['37, 40, 755, 489']
     HEADERS = [
-        'Item No.', 'Final Pay Item', 'Item Code', 'Item Description',
-        'Unit of Measure', 'Estimated Quantity', 'Bid', 'Amount'
+        'Item No.', 'Bid', 'Amount','Bid', 'Amount'
     ]
 
     def _process(self, raw_dfs):
@@ -141,8 +139,6 @@ class RemainingBidderTableProcessor(BaseTableProcessor):
         # 1. Normalize columns (your original logic)
         processed_dfs = []
         for df in raw_dfs:
-            if len(df.columns) == 7:
-                df.insert(1, 'Final Pay Item', '')
             df.columns = self.HEADERS
             processed_dfs.append(df)
         
@@ -150,20 +146,5 @@ class RemainingBidderTableProcessor(BaseTableProcessor):
             return pd.DataFrame()
 
         combined_df = pd.concat(processed_dfs, ignore_index=True)
-        
-        # 2. Merge broken description lines (your original logic)
-        rows_to_drop = []
-        for i in range(1, len(combined_df)):
-            current_row = combined_df.iloc[i]
-            desc = str(current_row['Item Description']).strip()
-            unit = str(current_row['Unit of Measure']).strip()
-            qty = str(current_row['Estimated Quantity']).strip()
 
-            if desc and not unit and not qty:
-                prev_desc = str(combined_df.loc[i - 1, 'Item Description']).strip()
-                combined_df.loc[i - 1, 'Item Description'] = f"{prev_desc} {desc}"
-                rows_to_drop.append(i)
-        
-        final_df = combined_df.drop(rows_to_drop).reset_index(drop=True)
-        print(f"Merged {len(rows_to_drop)} broken lines.")
-        return final_df
+        return combined_df
