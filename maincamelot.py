@@ -4,7 +4,7 @@ import pandas as pd
 # Load the PDF file
 file_path = '12-0K93U4.pdf'
 
-table_regions = ['35, 134, 760, 600']
+table_regions = ['38.2, 29.8, 752, 478']
 # Extract tables from page 3 to the end of the document
 tables = camelot.read_pdf(file_path, pages='3-3', flavor='stream', table_areas=table_regions)
 
@@ -16,6 +16,9 @@ tables = camelot.read_pdf(file_path, pages='3-3', flavor='stream', table_areas=t
 
 # Process and display each table's data
 for i, table in enumerate(tables):
+    # Visualize the table
+    # You can change the 'kind' to 'text', 'grid', 'line', or 'joint'
+    camelot.plot(table, kind='grid').show()
     # Set the first row as the header
     df = table.df
     df.columns = df.iloc[0]
@@ -26,3 +29,5 @@ for i, table in enumerate(tables):
     print(f"--- Table {i+1} ---")
     print(df)
     print("\n" * 2)
+
+input()
