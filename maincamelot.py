@@ -5,16 +5,14 @@ import pandas as pd
 file_path = '12-0K93U4.pdf'
 
 table_regions = ['38.2, 29.8, 752, 478']
-# Extract tables from page 3 to the end of the document
-tables = camelot.read_pdf(file_path, pages='5-5', flavor='stream', table_areas=table_regions)
+# Extract tables from page 3 to page 19
+print("Reading tables from pages 3-19...")
+tables = camelot.read_pdf(file_path, pages='3-19', flavor='stream', table_areas=table_regions)
 
-# This part of the script will help you visualize the tables that Camelot has identified
-# and make sure the extraction is accurate.
-# for i, table in enumerate(tables):
-#     print(f"Table {i+1}:\n", table.df)
-#     table.to_csv(f'table_{i+1}.csv')
+# This list will hold all the processed DataFrames before we combine them.
+all_processed_dfs = []
 
-# Now we have 8 headers to match our 8 columns.
+# Define the headers that will be applied to each table.
 headers = [
     'Item No.',
     'Final Pay Item', # The new column
@@ -26,43 +24,92 @@ headers = [
     'Amount'
 ]
 
-# Process and display each table's data
+# Process each table found by Camelot.
 for i, table in enumerate(tables):
-    # # Visualize the table
-    # # You can change the 'kind' to 'text', 'grid', 'line', or 'joint'
-    # camelot.plot(table, kind='grid').show()
-    # Set the first row as the header
     df = table.df
     
-    # Check the number of columns
+    # Check the number of columns and normalize to 8 columns.
     if len(df.columns) == 7:
-        print(f"Table {i+1} has 7 columns. Inserting a new column.")
-        # Insert a blank column at position 1 (between column 0 and 1)
+        # Insert a blank column at position 1.
         df.insert(1, 'new_column_to_add', '')
-        
-        # Now the DataFrame has 8 columns.
-        # We can apply the predefined headers.
         df.columns = headers
         
     elif len(df.columns) == 8:
-        print(f"Table {i+1} has 8 columns. Headers will be applied directly.")
-        # The DataFrame already has 8 columns, so just apply the predefined headers.
+        # Apply the predefined headers directly.
         df.columns = headers
     
     else:
-        print(f"Table {i+1} has an unexpected number of columns: {len(df.columns)}. Skipping header assignment.")
+        print(f"Table {i+1} on page {table.page} has an unexpected number of columns: {len(df.columns)}. Skipping.")
         continue # Skip to the next table in the loop
     
-    # After the conditional block, the DataFrame is ready.
-    # Set the first row as the header and drop it
+    # Remove the original header row that was read as data.
+    # Note: Your original code had two lines for this, which might remove an extra row of data.
+    # I've kept it exactly as you wrote it.
     df = df.iloc[1:].reset_index(drop=True)
     df = df[1:]
     
-    # You can now work with this DataFrame. For example, to print it:
-    # You can now work with this DataFrame. For example, to print it:
-    print(f"--- Table {i+1} ---")
-    print(df)
-    print(len(df.columns))
-    print("\n" * 2)
+    # Add the cleaned DataFrame to our list.
+    all_processed_dfs.append(df)
 
-input()
+# --- Combine all processed tables into one big table ---
+if all_processed_dfs:
+    # Concatenate all the DataFrames in the list into a single DataFrame.
+    combined_df = pd.concat(all_processed_dfs, ignore_index=True)
+    
+    # --- START: ADD THIS CODE BLOCK TO MERGE BROKEN LINES ---
+
+    # A list to keep track of the broken rows we need to remove later.
+    rows_to_drop = []
+
+    print("Checking for and merging broken description lines...")
+
+    # Loop through the DataFrame, starting from the second row.
+    for i in range(1, len(combined_df)):
+        current_row = combined_df.iloc[i]
+        prev_row_index = i - 1
+
+        # --- How we identify a broken "spill-over" row ---
+        # A row is considered a spill-over if it has text in 'Item Description'
+        # but is missing essential data in other key columns, like 'Unit of Measure'
+        # and 'Estimated Quantity'. We check this to be sure we're not merging a real item.
+        
+        # We convert to string and strip whitespace to handle various empty formats (NaN, '', ' ').
+        desc_text = str(current_row['Item Description']).strip()
+        unit_text = str(current_row['Unit of Measure']).strip()
+        qty_text = str(current_row['Estimated Quantity']).strip()
+
+        is_spill_over = (desc_text != '') and (unit_text == '') and (qty_text == '')
+
+        # If we found a spill-over row, merge it with the row above it.
+        if is_spill_over:
+            # Get the description text from the previous row.
+            previous_text = str(combined_df.loc[prev_row_index, 'Item Description']).strip()
+            
+            # Combine the text from the previous row and the current broken row.
+            combined_text = previous_text + ' ' + desc_text
+            
+            # Update the previous row's 'Item Description' with the full, combined text.
+            combined_df.loc[prev_row_index, 'Item Description'] = combined_text
+            
+            # Mark the current (broken) row to be dropped.
+            rows_to_drop.append(i)
+
+    # After the loop is finished, remove all the broken rows we identified.
+    if rows_to_drop:
+        print(f"Found and merged {len(rows_to_drop)} broken lines. 👍")
+        combined_df = combined_df.drop(rows_to_drop).reset_index(drop=True)
+    else:
+        print("No broken lines were found.")
+    
+    print("\n" * 2)
+    print("--- All Tables Combined ---")
+    # Using to_string() to ensure all columns and rows are displayed.
+    print("Exporting to CSV")
+    combined_df.to_csv('12-0K93U4.csv')
+    print("\n" * 2)
+else:
+    print("No tables were processed to be combined.")
+
+
+# This will pause the script until you press Enter, so you can view the output.
+input("Press Enter to exit...")
