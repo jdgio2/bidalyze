@@ -29,7 +29,7 @@ class PageFinder:
                 start_page = i + 1 # Page numbers are 1-based
             
             # If we've found the start, now look for the end
-            if start_page is not None and end_keyword.lower() in text:
+            if start_page is not None and start_keyword.lower() not in text:
                 end_page = i
                 break # Stop once we find the end keyword
         

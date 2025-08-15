@@ -11,6 +11,7 @@ class BaseTableProcessor:
         self.file_path = file_path
         self.page_range = page_range # Store the dynamic page range
         self.df = None
+        self.plot = False  # Default to not plotting
 
     def _extract_raw_dfs(self):
         if not self.page_range:
@@ -26,6 +27,10 @@ class BaseTableProcessor:
             flavor='stream',  # Use 'stream' for continuous text tables
             # ... rest of the function is the same
         )
+
+        if(self.plot):
+            for i, table in enumerate(tables):
+                camelot.plot(table, kind='grid').show()
         return [table.df for table in tables]
 
     def _process(self, raw_dfs):
@@ -48,8 +53,9 @@ class BaseTableProcessor:
         else:
             print("No data to save. Run the process first.")
     
-    def run(self):
+    def run(self, plot=False):
         """The main execution method that orchestrates the entire process."""
+        self.plot = plot
         print(f"--- Starting processing for {self.__class__.__name__} ---")
         raw_dataframes = self._extract_raw_dfs()
         if not raw_dataframes:
@@ -90,13 +96,27 @@ class LowBidderTableProcessor(BaseTableProcessor):
         rows_to_drop = []
         for i in range(1, len(combined_df)):
             current_row = combined_df.iloc[i]
-            desc = str(current_row['Item Description']).strip()
-            unit = str(current_row['Unit of Measure']).strip()
-            qty = str(current_row['Estimated Quantity']).strip()
+            prev_row_index = i - 1
 
-            if desc and not unit and not qty:
-                prev_desc = str(combined_df.loc[i - 1, 'Item Description']).strip()
-                combined_df.loc[i - 1, 'Item Description'] = f"{prev_desc} {desc}"
+            # We convert to string and strip whitespace to handle various empty formats (NaN, '', ' ').
+            desc_text = str(current_row['Item Description']).strip()
+            unit_text = str(current_row['Unit of Measure']).strip()
+            qty_text = str(current_row['Estimated Quantity']).strip()
+
+            is_spill_over = (desc_text != '') and (unit_text == '') and (qty_text == '')
+
+            # If we found a spill-over row, merge it with the row above it.
+            if is_spill_over:
+                # Get the description text from the previous row.
+                previous_text = str(combined_df.loc[prev_row_index, 'Item Description']).strip()
+                
+                # Combine the text from the previous row and the current broken row.
+                combined_text = previous_text + ' ' + desc_text
+                
+                # Update the previous row's 'Item Description' with the full, combined text.
+                combined_df.loc[prev_row_index, 'Item Description'] = combined_text
+                
+                # Mark the current (broken) row to be dropped.
                 rows_to_drop.append(i)
         
         final_df = combined_df.drop(rows_to_drop).reset_index(drop=True)

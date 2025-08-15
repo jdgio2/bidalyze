@@ -2,7 +2,8 @@
 from page_finder import PageFinder
 from table_processors import LowBidderTableProcessor
 
-PDF_FILE_PATH = '12-0K93U4.pdf'
+PDF_FILE_PATH = '11-430234.pdf'
+FILE_NAME = PDF_FILE_PATH.split('.')[0]
 
 def main():
     """Main script to find page ranges and then process tables."""
@@ -27,8 +28,8 @@ def main():
             file_path=PDF_FILE_PATH,
             page_range=bid_item_range # Pass the discovered range here
         )
-        bid_item_processor.run()
-        bid_item_processor.save_to_csv('bid_items_output.csv')
+        bid_item_processor.run()  # Set plot=True to visualize the tables
+        bid_item_processor.save_to_csv(f'{FILE_NAME}.csv')
 
 if __name__ == "__main__":
     main()
