@@ -3,25 +3,28 @@ import camelot
 import pandas as pd
 
 class BaseTableProcessor:
-    """A base class for processing a specific type of table from a PDF."""
-    
-    # These should be defined by the child class
-    PAGE_RANGE = ""
     TABLE_AREA = []
     HEADERS = []
 
-    def __init__(self, file_path):
+    # Update the initializer to accept a page_range
+    def __init__(self, file_path, page_range):
         self.file_path = file_path
-        self.df = None # This will hold the final, processed DataFrame
+        self.page_range = page_range # Store the dynamic page range
+        self.df = None
 
     def _extract_raw_dfs(self):
-        """Extracts tables using Camelot based on class attributes."""
-        print(f"[{self.__class__.__name__}] Reading tables from pages {self.PAGE_RANGE}...")
+        if not self.page_range:
+            print("Error: Page range is not set. Cannot extract.")
+            return []
+        
+        # Use the instance variable self.page_range now
+        print(f"[{self.__class__.__name__}] Reading tables from pages {self.page_range}...")
         tables = camelot.read_pdf(
             self.file_path,
-            pages=self.PAGE_RANGE,
-            flavor='stream',
-            table_areas=self.TABLE_AREA
+            pages=self.page_range,
+            table_areas=self.TABLE_AREA,
+            flavor='stream',  # Use 'stream' for continuous text tables
+            # ... rest of the function is the same
         )
         return [table.df for table in tables]
 
@@ -57,6 +60,50 @@ class BaseTableProcessor:
 
 
 class LowBidderTableProcessor(BaseTableProcessor):
+    """Processes the detailed 'Bid Item' tables."""
+    
+    # --- Configuration specific to this table type ---
+    TABLE_AREA = ['38.2, 29.8, 752, 478']
+    HEADERS = [
+        'Item No.', 'Final Pay Item', 'Item Code', 'Item Description',
+        'Unit of Measure', 'Estimated Quantity', 'Bid', 'Amount'
+    ]
+
+    def _process(self, raw_dfs):
+        """Custom processing logic for Bid Item tables."""
+        print(f"[{self.__class__.__name__}] Applying custom Bid Item processing...")
+        
+        # 1. Normalize columns (your original logic)
+        processed_dfs = []
+        for df in raw_dfs:
+            if len(df.columns) == 7:
+                df.insert(1, 'Final Pay Item', '')
+            df.columns = self.HEADERS
+            processed_dfs.append(df)
+        
+        if not processed_dfs:
+            return pd.DataFrame()
+
+        combined_df = pd.concat(processed_dfs, ignore_index=True)
+        
+        # 2. Merge broken description lines (your original logic)
+        rows_to_drop = []
+        for i in range(1, len(combined_df)):
+            current_row = combined_df.iloc[i]
+            desc = str(current_row['Item Description']).strip()
+            unit = str(current_row['Unit of Measure']).strip()
+            qty = str(current_row['Estimated Quantity']).strip()
+
+            if desc and not unit and not qty:
+                prev_desc = str(combined_df.loc[i - 1, 'Item Description']).strip()
+                combined_df.loc[i - 1, 'Item Description'] = f"{prev_desc} {desc}"
+                rows_to_drop.append(i)
+        
+        final_df = combined_df.drop(rows_to_drop).reset_index(drop=True)
+        print(f"Merged {len(rows_to_drop)} broken lines.")
+        return final_df
+
+class RemainingBidderTableProcessor(BaseTableProcessor):
     """Processes the detailed 'Bid Item' tables."""
     
     # --- Configuration specific to this table type ---
@@ -100,13 +147,3 @@ class LowBidderTableProcessor(BaseTableProcessor):
         final_df = combined_df.drop(rows_to_drop).reset_index(drop=True)
         print(f"Merged {len(rows_to_drop)} broken lines.")
         return final_df
-
-# --- YOU WOULD ADD YOUR OTHER TABLE CLASSES HERE ---
-# class SummaryTableProcessor(BaseTableProcessor):
-#     PAGE_RANGE = "21-49" # Example
-#     # ... other specific settings ...
-#
-#     def _process(self, raw_dfs):
-#         # ... completely different cleaning logic for this table type ...
-#         print("Running summary table cleaning...")
-#         pass # Your logic here
