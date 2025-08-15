@@ -2,12 +2,13 @@ import camelot
 import pandas as pd
 
 # Load the PDF file
+file_name = ""
 file_path = '12-0K93U4.pdf'
 
 table_regions = ['38.2, 29.8, 752, 478']
 # Extract tables from page 3 to page 19
 print("Reading tables from pages 3-19...")
-tables = camelot.read_pdf(file_path, pages='3-19', flavor='stream', table_areas=table_regions)
+tables = camelot.read_pdf(file_path, pages='3-20', flavor='stream', table_areas=table_regions)
 
 # This list will hold all the processed DataFrames before we combine them.
 all_processed_dfs = []
@@ -24,10 +25,13 @@ headers = [
     'Amount'
 ]
 
+
 # Process each table found by Camelot.
 for i, table in enumerate(tables):
-    df = table.df
+    # camelot.plot(table, kind="grid").show()
     
+    df = table.df
+        
     # Check the number of columns and normalize to 8 columns.
     if len(df.columns) == 7:
         # Insert a blank column at position 1.
@@ -41,12 +45,6 @@ for i, table in enumerate(tables):
     else:
         print(f"Table {i+1} on page {table.page} has an unexpected number of columns: {len(df.columns)}. Skipping.")
         continue # Skip to the next table in the loop
-    
-    # Remove the original header row that was read as data.
-    # Note: Your original code had two lines for this, which might remove an extra row of data.
-    # I've kept it exactly as you wrote it.
-    df = df.iloc[1:].reset_index(drop=True)
-    df = df[1:]
     
     # Add the cleaned DataFrame to our list.
     all_processed_dfs.append(df)
